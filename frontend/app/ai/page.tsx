@@ -1,35 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import NavBar from "../components/NavBar";
-import Footer from "../components/Footer";
 
-interface Message {
-  role: "user" | "ai";
-  text: string;
-  time: string;
-}
-
-const STARTERS: Message[] = [
-  {
-    role: "ai",
-    text: "👋 Hello! I am your SchoolOS AI Tutor. Ask me any textbook question in Bangla or English and I will do my best to help you understand!",
-    time: new Date().toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit" }),
-  },
+const starterMessages = [
+  { role: "ai", text: "Hello! Ask any textbook question in Bangla or English." },
 ];
-
-const PROMPTS = [
-  "Explain photosynthesis in simple words",
-  "How do I solve a quadratic equation?",
-  "What is the water cycle?",
-  "Explain the French Revolution briefly",
-  "What are Newton's 3 laws of motion?",
-  "How to write a Bangla essay introduction?",
-];
-
-function fakeAnswer(q: string, classLevel: string, subject: string): string {
-  return `📚 Great question about "${q.slice(0, 50)}${q.length > 50 ? "..." : ""}"!\n\nFor Class ${classLevel} ${subject}:\n\nThe key idea here is to break the concept into simple steps. First, identify the main principle or rule involved. Then, think of a real-life example that matches your question. Finally, apply the rule step by step.\n\nHere is a simplified explanation: ${q} is one of the most important topics in your syllabus. Understanding the core concept first will make solving related problems much easier.\n\nWould you like me to simplify this further or give a worked example? 😊`;
-}
 
 export default function AITutorPage() {
   const [classLevel, setClassLevel] = useState("9");
