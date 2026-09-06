@@ -1,0 +1,65 @@
+[
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "NCTB Class 5 Primary Science",
+    "section": "NCTB Class 5 Primary Science",
+    "page": 1,
+    "text": "# NCTB Class 5 Primary Science"
+  },
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "Photosynthesis",
+    "section": "Food Preparation in Plants",
+    "page": 1,
+    "text": "Title: How Green Plants Make Food  Plants are living organisms that can produce their own food through a natural process called photosynthesis. Unlike animals and human beings, green plants do not need to consume other living things for energy. Green leaves contain a special green pigment known as chlorophyll. Chlorophyll captures radiant energy from sunlight."
+  },
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "Photosynthesis",
+    "section": "Food Preparation in Plants",
+    "page": 2,
+    "text": "Title: The Process of Photosynthesis  During photosynthesis, plants take in carbon dioxide gas from the surrounding air through tiny microscopic pores in their leaves called stomata. At the same time, roots absorb water and dissolved minerals from the soil. Using the trapped solar energy, chlorophyll converts carbon dioxide and water into glucose (food) and releases oxygen into the atmosphere."
+  },
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "Photosynthesis",
+    "section": "Food Preparation in Plants",
+    "page": 2,
+    "text": "Using the trapped solar energy, chlorophyll converts carbon dioxide and water into glucose (food) and releases oxygen into the atmosphere. Equation for Photosynthesis: Carbon Dioxide + Water + Sunlight (with Chlorophyll) -> Glucose (Food) + Oxygen"
+  },
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "Photosynthesis",
+    "section": "Plant Respiration and Energy",
+    "page": 12,
+    "text": "Title: Energy Storage and Utilization  The food prepared by plants during photosynthesis is converted into starch and stored in roots, stems, leaves, fruits, and seeds. When the plant requires energy for growth and repair, it breaks down this stored glucose through cellular respiration, releasing energy and returning carbon dioxide to the environment."
+  },
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "Environmental Pollution",
+    "section": "Air and Water Pollution",
+    "page": 15,
+    "text": "Title: Causes and Effects of Pollution  Environmental pollution is the contamination of our natural surroundings with harmful substances. There are four major types of environmental pollution: air pollution, water pollution, soil pollution, and noise pollution. Air pollution occurs when smoke, dust, and toxic gases from factories and vehicles mix into the atmosphere, causing respiratory diseases in human beings and contributing to global warming."
+  },
+  {
+    "classLevel": 5,
+    "subject": "Science",
+    "book": "NCTB Science",
+    "chapter": "Environmental Pollution",
+    "section": "Air and Water Pollution",
+    "page": 15,
+    "text": "Air pollution occurs when smoke, dust, and toxic gases from factories and vehicles mix into the atmosphere, causing respiratory diseases in human beings and contributing to global warming. Water pollution occurs when untreated domestic waste, industrial effluents, and agricultural chemicals flow into rivers, ponds, and canals. Contaminated water harms aquatic life and spreads dangerous water-borne diseases like cholera and diarrhea."
+  }
+]

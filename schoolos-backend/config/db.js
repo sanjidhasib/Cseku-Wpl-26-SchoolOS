@@ -4,12 +4,17 @@ const mongoose = require("mongoose");
 // Call this once when the server starts (see server.js)
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
+    const mongoURI = process.env.MONGO_URI || "mongodb://localhost:27017/schoolos";
+    const conn = await mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 2000,
+    });
     console.log(`MongoDB connected: ${conn.connection.host}`);
+    return conn;
   } catch (error) {
-    console.error(`MongoDB connection error: ${error.message}`);
-    process.exit(1); // stop the server if DB connection fails
+    console.warn(`⚠️ MongoDB connection warning: ${error.message}`);
+    console.warn("⚠️ Continuing server startup for AI Tutor & REST endpoints.");
   }
 };
 
 module.exports = connectDB;
+
