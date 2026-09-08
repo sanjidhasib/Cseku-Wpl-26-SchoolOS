@@ -358,11 +358,104 @@ export const NCTB_CLASSES: ClassData[] = [
   },
 ];
 
-export const SAMPLE_QUESTIONS = [
-  "What is the difference between photosynthesis and cellular respiration?",
-  "How do I prove the Pythagorean theorem geometrically?",
-  "Explain Newton's laws of motion with real-life examples.",
-  "What was the significance of the 1952 Language Movement in Bangladesh?",
-  "How to balance a chemical equation step by step?",
-  "What are rational and irrational numbers?",
-];
+/** Legacy export kept for any other files that may import it */
+export const SAMPLE_QUESTIONS: string[] = [];
+
+/** Per-class, per-subject sample questions */
+export const SAMPLE_QUESTIONS_MAP: Record<string, Record<string, string[]>> = {
+  "1": {
+    bangla: ["বর্ণমালায় কয়টি স্বরবর্ণ আছে?", "স্বরবর্ণ ও ব্যঞ্জনবর্ণের পার্থক্য কী?"],
+    english: ["What are the vowels in English?", "How do we greet someone in English?"],
+    math: ["What is 3 + 5?", "How many sides does a triangle have?"],
+  },
+  "2": {
+    bangla: ["একটি সুন্দর বাক্য লেখো।", "বিশেষ্য কাকে বলে?"],
+    english: ["Describe your family in one sentence.", "What are action words?"],
+    math: ["What is 12 + 18?", "What is subtraction?"],
+  },
+  "3": {
+    bangla: ["সন্ধি কাকে বলে?", "কবিতা ও গল্পের পার্থক্য কী?"],
+    english: ["What is a noun?", "How do you write about yourself?"],
+    math: ["What is a fraction?", "What is multiplication?"],
+    "Primary Science": ["জীব ও জড়ের পার্থক্য কী?", "গাছের কাজ কী?"],
+    "Bangladesh and Global Studies": ["আমাদের পরিবেশ কী?", "জাতীয় সংগীত কী?"],
+  },
+  "4": {
+    bangla: ["ভাষা কাকে বলে?", "বাংলা ব্যাকরণ কী?"],
+    english: ["What are adjectives?", "Describe a season you like."],
+    math: ["What are factors and multiples?", "How do you add fractions?"],
+    "Primary Science": ["বাস্তুতন্ত্র কী?", "খাদ্যের পুষ্টিগুণ সম্পর্কে বলো।"],
+    "Bangladesh and Global Studies": ["বাংলাদেশের ভূগোল সম্পর্কে বলো।", "নাগরিকের অধিকার কী?"],
+  },
+  "5": {
+    bangla: ["সমাস কাকে বলে?", "রচনা লেখার নিয়ম কী?"],
+    english: ["What is a paragraph?", "What is the Liberation War Museum?"],
+    math: ["What is the difference between LCM and GCF?", "How do you divide fractions?"],
+    "Primary Science": [
+      "What is photosynthesis?",
+      "Why do plants need sunlight?",
+      "What are the parts of a plant?",
+      "পরিবেশ দূষণ কী?",
+    ],
+    "Bangladesh and Global Studies": ["মুক্তিযুদ্ধ কেন হয়েছিল?", "ব্রিটিশ শাসনের প্রভাব কী ছিল?"],
+  },
+  "6": {
+    bangla: ["প্রবন্ধ লেখার নিয়ম কী?", "বাংলা সাহিত্যের যুগ বিভাগ কী?"],
+    english: ["What is a compound sentence?", "How do you write a formal letter?"],
+    math: ["What is a ratio?", "What are algebraic expressions?"],
+    Science: ["কোষ কী?", "ইন্দ্রিয় ও স্নায়ুতন্ত্র কীভাবে কাজ করে?", "বৈজ্ঞানিক পদ্ধতি কী?"],
+    "Bangladesh and Global Studies": ["বাংলাদেশের ইতিহাস সম্পর্কে বলো।", "বিশ্ব সভ্যতার বিকাশ কীভাবে হয়েছিল?"],
+    "Information and Communication Technology (ICT)": ["ICT কী?", "ইন্টারনেট নিরাপদে ব্যবহার করার উপায় কী?"],
+  },
+  "7": {
+    bangla: ["বাক্যের উদ্দেশ্য ও বিধেয় কী?", "ছোটগল্পের বৈশিষ্ট্য কী?"],
+    english: ["What is a complex sentence?", "How do you analyze a poem?"],
+    math: ["What are rational and irrational numbers?", "How do you solve a linear equation?"],
+    Science: ["কোষের গঠন কী?", "পদার্থের গঠন সম্পর্কে বলো।", "শক্তি ও কাজ কী?"],
+    "Bangladesh and Global Studies": ["স্বাধীনতা আন্দোলন সম্পর্কে বলো।", "জলবায়ুর বৈচিত্র্য কী?"],
+    "Information and Communication Technology (ICT)": ["কম্পিউটার নেটওয়ার্ক কী?", "ডিজিটাল নিরাপত্তা কী?"],
+  },
+  "8": {
+    bangla: ["সাহিত্যের বিভিন্ন রূপ কী কী?", "বাংলা ব্যাকরণের মূল বিষয় কী?"],
+    english: ["What is passive voice?", "Explain the art of writing."],
+    math: [
+      "What is the Pythagorean theorem?",
+      "How do you calculate profit and loss?",
+      "What are algebraic formulae?",
+    ],
+    Science: [
+      "প্রাণী জগতের শ্রেণিবিন্যাস কীভাবে করা হয়?",
+      "অভিস্রবণ ও ব্যাপন কী?",
+      "রাসায়নিক বিক্রিয়া কী?",
+    ],
+    "Bangladesh and Global Studies": ["মুক্তিযুদ্ধ ১৯৭১ সম্পর্কে বলো।", "রাষ্ট্র ও শাসন কী?"],
+    "Information and Communication Technology (ICT)": ["নেটওয়ার্ক টপোলজি কী?", "সাইবার নিরাপত্তা কীভাবে নিশ্চিত করা যায়?"],
+  },
+  "9": {
+    bangla: ["বাংলা সাহিত্যের যুগ বিভাগ কী?", "কবিতার ছন্দ বিশ্লেষণ করো।"],
+    english: ["What is formal letter writing?", "Explain the theme of a poem."],
+    math: ["What is a set and function?", "What are logarithms?", "Explain trigonometry basics."],
+    Physics: ["গতির সূত্র কী?", "কাজ, শক্তি ও ক্ষমতা কী?", "আলোর প্রতিফলন কীভাবে হয়?"],
+    Chemistry: ["পরমাণুর গঠন কী?", "পর্যায় সারণি কী?", "রাসায়নিক বন্ধন কী?"],
+    Biology: ["সালোকসংশ্লেষণ কী?", "কোষ বিভাজন কীভাবে হয়?", "বংশগতি কী?"],
+    "Higher Mathematics": ["সেট ও ফাংশন কী?", "স্থানাঙ্ক জ্যামিতি কী?"],
+    "Bangladesh and Global Studies": ["বাংলাদেশের সংবিধান কী?", "জাতীয়তাবাদের উদ্ভব কীভাবে হয়েছিল?"],
+    "Information and Communication Technology (ICT)": ["ডিজিটাল কন্টেন্ট কী?", "তথ্য প্রযুক্তির বিশ্বব্যাপী প্রভাব কী?"],
+  },
+  "10": {
+    bangla: ["SSC পরীক্ষার জন্য রচনা লেখার কৌশল কী?", "বাংলা ব্যাকরণের গুরুত্বপূর্ণ বিষয় কী?"],
+    english: ["How do you write a CV?", "What are good citizenship traits?"],
+    math: ["What are trigonometric ratios?", "How do you calculate the area of a circle?", "What is statistics?"],
+    Physics: ["তরঙ্গ ও শব্দ কী?", "আলোর প্রতিসরণ কীভাবে হয়?", "বিদ্যুৎ প্রবাহ কী?"],
+    Chemistry: [
+      "রাসায়নিক বিক্রিয়ার হার কী?",
+      "অ্যাসিড ও ক্ষার কী?",
+      "আমাদের জীবনে রসায়নের ভূমিকা কী?",
+    ],
+    Biology: ["উদ্ভিদ ও প্রাণীতে প্রজনন কীভাবে হয়?", "বায়োটেকনোলজি কী?"],
+    "Higher Mathematics": ["দ্বিপদী সম্প্রসারণ কী?", "ত্রিকোণমিতিক সমীকরণ কী?"],
+    "Bangladesh and Global Studies": ["বাংলাদেশের অর্থনৈতিক সম্পদ কী?", "সামাজিক পরিবর্তনের কারণ কী?"],
+    "Information and Communication Technology (ICT)": ["ডেটাবেজ ম্যানেজমেন্ট কী?", "মাল্টিমিডিয়া কী?"],
+  },
+};
+
