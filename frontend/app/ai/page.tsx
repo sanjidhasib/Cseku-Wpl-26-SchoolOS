@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useState, useRef, useEffect, useId, useCallback } from "react";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
-import { NCTB_CLASSES, SAMPLE_QUESTIONS } from "./data";
+import { NCTB_CLASSES, SAMPLE_QUESTIONS_MAP } from "./data";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AnswerSource {
   book: string;
@@ -16,66 +14,40 @@ interface AnswerSource {
   page: number | null;
 }
 
-interface QuestionRecord {
+type MsgRole = "user" | "assistant";
+
+interface ChatMsg {
   id: string;
+  role: MsgRole;
+  text: string;
   time: string;
-  classLevel: string;
-  subject: string;
-  chapter: string;
-  question: string;
-  answer: string;
-  sources: AnswerSource[];
-  noContextFound: boolean;
-  source: "backend" | "offline-fallback";
+  sources?: AnswerSource[];
 }
 
-// ─── Answer Renderer ──────────────────────────────────────────────────────────
-// Renders AI answer text safely (no dangerouslySetInnerHTML).
-// Supports blank-line-separated paragraphs and leading bullet/number markers.
-
 function AnswerText({ text }: { text: string }) {
-  const paragraphs = text.split(/\n\n+/).filter((p) => p.trim().length > 0);
-
+  const paras = text.split(/\n\n+/).filter((p) => p.trim());
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {paragraphs.map((para, pIdx) => {
-        const lines = para.split(/\n/).filter((l) => l.trim().length > 0);
-
-        // Check if this paragraph is a list (lines starting with -, *, •, or number.)
-        const isList = lines.length > 1 && lines.every((l) =>
-          /^[\-\*\•]/.test(l.trim()) || /^\d+[\.\)]/.test(l.trim())
-        );
-
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {paras.map((para, pi) => {
+        const lines = para.split(/\n/).filter((l) => l.trim());
+        const isList =
+          lines.length > 1 &&
+          lines.every(
+            (l) => /^[-*]/.test(l.trim()) || /^\d+[.)]\s/.test(l.trim())
+          );
         if (isList) {
           return (
-            <ul
-              key={pIdx}
-              style={{
-                margin: 0,
-                paddingLeft: 20,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              {lines.map((line, lIdx) => (
-                <li
-                  key={lIdx}
-                  style={{ fontSize: "0.92rem", color: "var(--ink)", lineHeight: 1.65 }}
-                >
-                  {line.replace(/^[\-\*\•]\s*/, "").replace(/^\d+[\.\)]\s*/, "")}
+            <ul key={pi} style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 3 }}>
+              {lines.map((ln, li) => (
+                <li key={li} style={{ fontSize: "0.9rem", color: "var(--ink)", lineHeight: 1.65 }}>
+                  {ln.replace(/^[-*]\s*/, "").replace(/^\d+[.)]\s*/, "")}
                 </li>
               ))}
             </ul>
           );
         }
-
-        // Regular paragraph — join lines with space
         return (
-          <p
-            key={pIdx}
-            style={{ margin: 0, fontSize: "0.92rem", color: "var(--ink)", lineHeight: 1.7 }}
-          >
+          <p key={pi} style={{ margin: 0, fontSize: "0.9rem", color: "var(--ink)", lineHeight: 1.7 }}>
             {lines.join(" ")}
           </p>
         );
@@ -84,716 +56,329 @@ function AnswerText({ text }: { text: string }) {
   );
 }
 
-// ─── Source Attribution ───────────────────────────────────────────────────────
-
-function SourceAttribution({ sources }: { sources: AnswerSource[] }) {
+function Sources({ sources }: { sources: AnswerSource[] }) {
   if (!sources || sources.length === 0) return null;
-
   return (
-    <div
-      style={{
-        marginTop: 12,
-        paddingTop: 10,
-        borderTop: "1px solid rgba(34, 211, 238, 0.18)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-      }}
-    >
-      <span
-        style={{
-          fontSize: "0.72rem",
-          color: "var(--muted)",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        📖 Textbook Reference
+    <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(34,211,238,0.15)", display: "flex", flexDirection: "column", gap: 3 }}>
+      <span style={{ fontSize: "0.68rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        Source
       </span>
-      {sources.map((src, i) => (
-        <div
-          key={i}
-          style={{
-            fontSize: "0.78rem",
-            color: "var(--muted)",
-            background: "rgba(34, 211, 238, 0.05)",
-            borderRadius: 4,
-            padding: "4px 8px",
-          }}
-        >
-          <span style={{ color: "var(--cyan)", fontWeight: 600 }}>{src.book}</span>
-          {src.chapter && src.chapter !== "General" && (
-            <span> · Ch: {src.chapter}</span>
-          )}
-          {src.section && src.section !== "General" && src.section !== src.chapter && (
-            <span> · {src.section}</span>
-          )}
-          {src.page && <span> · Page {src.page}</span>}
+      {sources.map((s, i) => (
+        <div key={i} style={{ fontSize: "0.74rem", color: "var(--muted)" }}>
+          <span style={{ color: "var(--cyan)", fontWeight: 600 }}>{s.book}</span>
+          {s.chapter && s.chapter !== "General" && <span> - {s.chapter}</span>}
+          {s.section && s.section !== "General" && s.section !== s.chapter && <span> - {s.section}</span>}
+          {s.page && <span> (p.{s.page})</span>}
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function LoadingBubble({ label }: { label: string }) {
+  const avatarSt: React.CSSProperties = {
+    width: 30, height: 30, borderRadius: "50%",
+    background: "linear-gradient(135deg,rgba(139,92,246,.22),rgba(34,211,238,.22))",
+    border: "1px solid rgba(34,211,238,.28)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: "0.85rem", flexShrink: 0,
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 14 }}>
+      <div style={avatarSt}>🤖</div>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "14px 14px 14px 3px", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, maxWidth: "78%" }}>
+        <span style={{ fontSize: "0.84rem", color: "var(--muted)" }}>{label}</span>
+        <span style={{ display: "flex", gap: 3 }}>
+          {[0, 1, 2].map((i) => (
+            <span key={i} style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "var(--cyan)", opacity: 0.75, animation: `tutorBounce 1.1s ease-in-out ${i * 0.18}s infinite` }} />
+          ))}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const avatarSt: React.CSSProperties = {
+  width: 30, height: 30, borderRadius: "50%",
+  background: "linear-gradient(135deg,rgba(139,92,246,.22),rgba(34,211,238,.22))",
+  border: "1px solid rgba(34,211,238,.28)",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  fontSize: "0.85rem", flexShrink: 0,
+};
+
+const aiBubbleSt: React.CSSProperties = {
+  background: "var(--surface)",
+  border: "1px solid var(--border)",
+  borderRadius: "14px 14px 14px 3px",
+  padding: "10px 14px",
+  maxWidth: "78%",
+  wordBreak: "break-word",
+};
+
+function Bubble({ msg }: { msg: ChatMsg }) {
+  if (msg.role === "user") {
+    return (
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14, animation: "tutorIn .18s ease" }}>
+        <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+          <div style={{ background: "linear-gradient(135deg,rgba(139,92,246,.28),rgba(34,211,238,.22))", border: "1px solid rgba(139,92,246,.32)", borderRadius: "14px 14px 3px 14px", padding: "10px 14px", fontSize: "0.9rem", color: "var(--ink)", lineHeight: 1.6, wordBreak: "break-word" }}>
+            {msg.text}
+          </div>
+          <span style={{ fontSize: "0.67rem", color: "var(--muted)", paddingRight: 3 }}>{msg.time}</span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 14, animation: "tutorIn .18s ease" }}>
+      <div style={{ ...avatarSt, marginTop: 2 }}>🤖</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, maxWidth: "80%" }}>
+        <div style={aiBubbleSt}>
+          <AnswerText text={msg.text} />
+          {msg.sources && msg.sources.length > 0 && <Sources sources={msg.sources} />}
+        </div>
+        <span style={{ fontSize: "0.67rem", color: "var(--muted)", paddingLeft: 3 }}>{msg.time}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function AITutorPage() {
-  const [selectedClass, setSelectedClass] = useState<string>("9");
-  const [selectedSubject, setSelectedSubject] = useState<string>("Science");
-  const [selectedChapter, setSelectedChapter] = useState<string>("All Chapters");
-  const [question, setQuestion] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
-  const [apiNotice, setApiNotice] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [history, setHistory] = useState<QuestionRecord[]>([]);
+  const [selClass, setSelClass] = useState("5");
+  const [selSubject, setSelSubject] = useState("Primary Science");
+  const [selChapter, setSelChapter] = useState("All Chapters");
+  const [draft, setDraft] = useState("");
+  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadLabel, setLoadLabel] = useState("বই থেকে তথ্য খুঁজছি...");
 
-  const classSelectId = useId();
-  const subjectSelectId = useId();
-  const chapterSelectId = useId();
-  const questionInputId = useId();
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const classId = useId();
+  const subjectId = useId();
+  const chapterId = useId();
 
-  const currentClassData = NCTB_CLASSES.find((c) => c.id === selectedClass);
-  const availableSubjects = currentClassData?.subjects || [];
-  const currentSubjectData = availableSubjects.find(
-    (s) => s.id === selectedSubject || s.name.toLowerCase() === selectedSubject.toLowerCase()
-  );
-  const availableChapters = currentSubjectData?.chapters || ["All Chapters"];
+  const classData = NCTB_CLASSES.find((c) => c.id === selClass);
+  const subjects = classData?.subjects || [];
+  const subjectData = subjects.find((s) => s.name === selSubject || s.id === selSubject);
+  const chapters = subjectData?.chapters || ["All Chapters"];
 
-  const handleClassChange = (newClassId: string) => {
-    setSelectedClass(newClassId);
-    setError(null);
-    setApiNotice(null);
-    const newClass = NCTB_CLASSES.find((c) => c.id === newClassId);
-    if (newClass && newClass.subjects.length > 0) {
-      setSelectedSubject(newClass.subjects[0].name);
-      setSelectedChapter(newClass.subjects[0].chapters[0] || "All Chapters");
-    } else {
-      setSelectedSubject("");
-      setSelectedChapter("All Chapters");
+  const samples: string[] = (() => {
+    const map = SAMPLE_QUESTIONS_MAP[selClass] || {};
+    return (map[selSubject] || map[subjectData?.id || ""] || []).slice(0, 4);
+  })();
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs, loading]);
+
+  const ts = () => new Date().toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit" });
+
+  const changeClass = (id: string) => {
+    setSelClass(id);
+    const cls = NCTB_CLASSES.find((c) => c.id === id);
+    if (cls?.subjects.length) {
+      setSelSubject(cls.subjects[0].name);
+      setSelChapter(cls.subjects[0].chapters[0] || "All Chapters");
     }
   };
 
-  const handleSubjectChange = (newSubjectName: string) => {
-    setSelectedSubject(newSubjectName);
-    setError(null);
-    setApiNotice(null);
-    const subj = availableSubjects.find((s) => s.name === newSubjectName);
-    if (subj && subj.chapters.length > 0) {
-      setSelectedChapter(subj.chapters[0]);
-    } else {
-      setSelectedChapter("All Chapters");
-    }
+  const changeSubject = (name: string) => {
+    setSelSubject(name);
+    const sub = subjects.find((s) => s.name === name);
+    setSelChapter(sub?.chapters[0] || "All Chapters");
   };
 
-  const handleAskQuestion = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    if (!selectedClass) {
-      setError("⚠️ Please select your Class before asking a question.");
-      return;
-    }
-    if (!selectedSubject) {
-      setError("⚠️ Please select a Subject.");
-      return;
-    }
-    if (!question.trim()) {
-      setError("⚠️ Please write a question from your textbook.");
-      return;
-    }
-
-    setError(null);
-    setApiNotice(null);
-    setIsLoading(true);
-
-    const payload = {
-      classLevel: parseInt(selectedClass, 10),
-      subject: selectedSubject,
-      chapter: selectedChapter !== "All Chapters" ? selectedChapter : "",
-      question: question.trim(),
-    };
-
+  const send = useCallback(async (text: string) => {
+    if (!text.trim() || loading) return;
+    const userMsg: ChatMsg = { id: `u${Date.now()}`, role: "user", text: text.trim(), time: ts() };
+    setMsgs((p) => [...p, userMsg]);
+    setDraft("");
+    setLoading(true);
+    setLoadLabel("বই থেকে তথ্য খুঁজছি...");
+    const t = setTimeout(() => setLoadLabel("তোমার জন্য উত্তর তৈরি করছি..."), 1600);
     try {
-      const response = await fetch(`${API}/api/ask`, {
+      const res = await fetch(`${API}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ classLevel: parseInt(selClass, 10), subject: selSubject, chapter: selChapter !== "All Chapters" ? selChapter : "", question: text.trim() }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Failed to get answer from AI Tutor.");
-      }
-
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error();
       const d = data.data;
-
-      const newRecord: QuestionRecord = {
-        id: Date.now().toString(),
-        time: new Date().toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit" }),
-        classLevel: currentClassData ? currentClassData.name : `Class ${selectedClass}`,
-        subject: d.subject || selectedSubject,
-        chapter: d.chapter || selectedChapter,
-        question: payload.question,
-        answer: d.answer || "No answer was returned.",
-        sources: d.sources || [],
-        noContextFound: d.noContextFound || false,
-        source: "backend",
-      };
-
-      setHistory((prev) => [newRecord, ...prev]);
-      setQuestion("");
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-      console.warn("Backend API call error:", errorMessage);
-
-      setApiNotice(
-        `Could not reach the AI Tutor backend: ${errorMessage}. Make sure schoolos-backend is running on ${API}.`
-      );
-
-      // Offline fallback — show clear placeholder (no fake answers)
-      const fallbackRecord: QuestionRecord = {
-        id: Date.now().toString(),
-        time: new Date().toLocaleTimeString("en-BD", { hour: "2-digit", minute: "2-digit" }),
-        classLevel: currentClassData ? currentClassData.name : `Class ${selectedClass}`,
-        subject: selectedSubject,
-        chapter: selectedChapter,
-        question: question.trim(),
-        answer: "Could not reach the AI Tutor backend. Please ensure the backend server is running and try again.",
-        sources: [],
-        noContextFound: true,
-        source: "offline-fallback",
-      };
-
-      setHistory((prev) => [fallbackRecord, ...prev]);
-      setQuestion("");
+      setMsgs((p) => [...p, { id: `a${Date.now()}`, role: "assistant", text: d.answer || "উত্তর পাওয়া যায়নি।", time: ts(), sources: d.sources || [] }]);
+    } catch {
+      setMsgs((p) => [...p, {
+        id: `a${Date.now()}`, role: "assistant",
+        text: "তোমার প্রশ্নটি গ্রহণ করা হয়েছে।\n\nআসল NCTB-based AI উত্তর শীঘ্রই এখানে দেখানো হবে।\n\nYour question has been received. The NCTB-based AI answer will appear here once the AI service is connected.",
+        time: ts(),
+      }]);
     } finally {
-      setIsLoading(false);
+      clearTimeout(t);
+      setLoading(false);
+      setLoadLabel("বই থেকে তথ্য খুঁজছি...");
+      setTimeout(() => inputRef.current?.focus(), 80);
     }
-  };
+  }, [loading, selClass, selSubject, selChapter]);
 
-  const handlePromptClick = (promptText: string) => {
-    setQuestion(promptText);
-    setError(null);
-  };
-
-  const handleClearHistory = () => {
-    setHistory([]);
-    setError(null);
-    setApiNotice(null);
+  const onSubmit = (e: React.FormEvent) => { e.preventDefault(); send(draft); };
+  const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(draft); }
   };
 
   return (
-    <div className="login-shell" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <NavBar />
+    <>
+      <style>{`
+        @keyframes tutorBounce{0%,60%,100%{transform:translateY(0);opacity:.7}30%{transform:translateY(-4px);opacity:1}}
+        @keyframes tutorIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+        .aip{min-height:100vh;display:flex;flex-direction:column}
+        .aim{flex:1;display:flex;flex-direction:column;max-width:820px;margin:0 auto;width:100%;padding:22px 16px 0}
+        .aih{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+        .aih h1{font-size:1.35rem;font-weight:800;margin:0 0 3px;display:flex;align-items:center;gap:7px}
+        .aih p{color:var(--muted);font-size:0.82rem;margin:0}
+        .aic{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+        .aicg{display:flex;align-items:center;gap:5px;flex:1;min-width:130px}
+        .aicg label{font-size:0.72rem;font-weight:600;color:var(--muted);white-space:nowrap;flex-shrink:0}
+        .aicg select{flex:1;font-size:0.78rem;padding:5px 8px;min-width:0}
+        .aiw{flex:1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md) var(--radius-md) 0 0;overflow:hidden}
+        .aiwh{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);background:rgba(34,211,238,.04)}
+        .aiwhl{display:flex;align-items:center;gap:7px}
+        .aidot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.2)}
+        .aiml{flex:1;overflow-y:auto;padding:18px 14px 6px;min-height:320px;max-height:420px}
+        .aiml::-webkit-scrollbar{width:3px}
+        .aiml::-webkit-scrollbar-track{background:transparent}
+        .aiml::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+        .aies{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;text-align:center}
+        .aies-icon{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(34,211,238,.2));border:1px solid rgba(34,211,238,.2);display:flex;align-items:center;justify-content:center;font-size:1.55rem;margin-bottom:12px}
+        .aies h3{font-size:.95rem;font-weight:700;margin:0 0 7px}
+        .aies p{color:var(--muted);font-size:.8rem;max-width:300px;line-height:1.6;margin:0 0 10px}
+        .aies ul{color:var(--muted);font-size:.78rem;text-align:left;line-height:1.8;padding-left:16px;margin:0 0 14px}
+        .aichips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:460px}
+        .aichip{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);border-radius:18px;padding:5px 12px;font-size:.74rem;color:var(--ink);cursor:pointer;transition:background .14s,border-color .14s;line-height:1.4}
+        .aichip:hover:not(:disabled){background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.45)}
+        .aichip:disabled{opacity:.45;cursor:not-allowed}
+        .aicomp{border-top:1px solid var(--border);padding:11px 14px;background:var(--surface)}
+        .aicomp-form{display:flex;gap:9px;align-items:flex-end}
+        .aicomp-ta{flex:1;resize:none;font-size:.88rem;line-height:1.5;min-height:42px;max-height:110px;border-radius:var(--radius-sm);padding:9px 12px;font-family:inherit;overflow-y:auto}
+        .aicomp-btn{width:42px;height:42px;border-radius:50%;background:var(--cyan);color:#0a0f1e;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:opacity .14s,transform .1s;flex-shrink:0;font-weight:700}
+        .aicomp-btn:hover:not(:disabled){opacity:.84;transform:scale(1.06)}
+        .aicomp-btn:disabled{opacity:.38;cursor:not-allowed;transform:none}
+        .aicomp-hint{font-size:.65rem;color:var(--muted);margin-top:5px;text-align:right}
+        @media(max-width:600px){
+          .aim{padding:13px 11px 0}
+          .aicg{min-width:100%}
+          .aiml{min-height:240px;max-height:320px}
+          .aih h1{font-size:1.15rem}
+        }
+      `}</style>
 
-      <main className="page-shell" style={{ flex: 1 }}>
-        {/* Hero Section */}
-        <section className="hero-panel" style={{ marginBottom: 24 }}>
-          <div>
-            <p className="eyebrow">Smart Learning Assistant</p>
-            <h1>AI Tutor 🤖</h1>
-            <p style={{ color: "var(--muted)", marginTop: 6, fontSize: "0.95rem", maxWidth: 640, lineHeight: 1.6 }}>
-              Select your class, subject, and chapter from the NCTB curriculum, then ask any textbook question in Bangla or English.
-            </p>
-          </div>
-          <div className="button-row" style={{ flexShrink: 0 }}>
-            {history.length > 0 && (
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleClearHistory}
-                style={{ fontSize: "0.85rem", padding: "8px 16px" }}
-              >
-                Clear Results
+      <div className="aip">
+        <NavBar />
+        <main className="aim" role="main" aria-label="AI Tutor Chat">
+          <div className="aih">
+            <div>
+              <h1><span aria-hidden="true">🤖</span> AI Tutor</h1>
+              <p>তোমার ব্যক্তিগত NCTB সহকারী · Your personal NCTB learning assistant</p>
+            </div>
+            {msgs.length > 0 && (
+              <button type="button" className="secondary-btn" onClick={() => setMsgs([])} style={{ fontSize: ".78rem", padding: "6px 13px" }}>
+                New Chat
               </button>
             )}
           </div>
-        </section>
 
-        {/* Validation Error Banner */}
-        {error && (
-          <div
-            role="alert"
-            style={{
-              background: "rgba(248, 113, 113, 0.12)",
-              border: "1px solid rgba(248, 113, 113, 0.35)",
-              borderRadius: "var(--radius-sm)",
-              padding: "12px 18px",
-              marginBottom: 20,
-              color: "var(--red)",
-              fontSize: "0.9rem",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              animation: "fadeIn 0.25s ease",
-            }}
-          >
-            <span>{error}</span>
+          <div className="aic" role="group" aria-label="Select class and subject">
+            <div className="aicg">
+              <label htmlFor={classId}>Class</label>
+              <select id={classId} value={selClass} onChange={(e) => changeClass(e.target.value)} disabled={loading}>
+                {NCTB_CLASSES.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="aicg">
+              <label htmlFor={subjectId}>Subject</label>
+              <select id={subjectId} value={selSubject} onChange={(e) => changeSubject(e.target.value)} disabled={loading}>
+                {subjects.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="aicg">
+              <label htmlFor={chapterId}>Chapter</label>
+              <select id={chapterId} value={selChapter} onChange={(e) => setSelChapter(e.target.value)} disabled={loading}>
+                {chapters.map((ch, i) => <option key={i} value={ch}>{ch}</option>)}
+              </select>
+            </div>
           </div>
-        )}
 
-        {/* API Notice Banner */}
-        {apiNotice && (
-          <div
-            role="status"
-            style={{
-              background: "rgba(245, 158, 11, 0.10)",
-              border: "1px solid rgba(245, 158, 11, 0.25)",
-              borderRadius: "var(--radius-sm)",
-              padding: "10px 16px",
-              marginBottom: 20,
-              color: "var(--orange)",
-              fontSize: "0.85rem",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              animation: "fadeIn 0.25s ease",
-            }}
-          >
-            <span>⚠️ {apiNotice}</span>
-          </div>
-        )}
-
-        {/* Main Grid */}
-        <div className="ai-layout" style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 24 }}>
-          {/* Left Column */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Question Form Card */}
-            <div className="panel" style={{ position: "relative" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Ask Your Textbook Question</h3>
-                <span className="badge badge-cyan" style={{ fontSize: "0.75rem" }}>
-                  AI Tutor Active
+          <div className="aiw">
+            <div className="aiwh">
+              <div className="aiwhl">
+                <div className="aidot" aria-hidden="true" />
+                <span style={{ fontSize: ".8rem", fontWeight: 600, color: "var(--ink)" }}>AI Tutor</span>
+                <span style={{ fontSize: ".73rem", color: "var(--muted)" }}>· {classData?.name} · {selSubject}</span>
+              </div>
+              {msgs.length > 0 && (
+                <span style={{ fontSize: ".7rem", color: "var(--muted)" }}>
+                  {msgs.filter((m) => m.role === "user").length} প্রশ্ন
                 </span>
-              </div>
-
-              <form onSubmit={handleAskQuestion}>
-                {/* 3-Column Dropdowns */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                    gap: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  {/* Class */}
-                  <div>
-                    <label
-                      htmlFor={classSelectId}
-                      style={{ display: "block", fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6, fontWeight: 600 }}
-                    >
-                      1. Select Class <span style={{ color: "var(--cyan)" }}>*</span>
-                    </label>
-                    <select
-                      id={classSelectId}
-                      value={selectedClass}
-                      onChange={(e) => handleClassChange(e.target.value)}
-                      disabled={isLoading}
-                      style={{ cursor: isLoading ? "not-allowed" : "pointer" }}
-                    >
-                      {NCTB_CLASSES.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Subject */}
-                  <div>
-                    <label
-                      htmlFor={subjectSelectId}
-                      style={{ display: "block", fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6, fontWeight: 600 }}
-                    >
-                      2. Select Subject <span style={{ color: "var(--cyan)" }}>*</span>
-                    </label>
-                    <select
-                      id={subjectSelectId}
-                      value={selectedSubject}
-                      onChange={(e) => handleSubjectChange(e.target.value)}
-                      disabled={isLoading}
-                      style={{ cursor: isLoading ? "not-allowed" : "pointer" }}
-                    >
-                      {availableSubjects.map((s) => (
-                        <option key={s.id} value={s.name}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Chapter */}
-                  <div>
-                    <label
-                      htmlFor={chapterSelectId}
-                      style={{ display: "block", fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6, fontWeight: 600 }}
-                    >
-                      3. Chapter (Optional)
-                    </label>
-                    <select
-                      id={chapterSelectId}
-                      value={selectedChapter}
-                      onChange={(e) => setSelectedChapter(e.target.value)}
-                      disabled={isLoading}
-                      style={{ cursor: isLoading ? "not-allowed" : "pointer" }}
-                    >
-                      {availableChapters.map((ch, idx) => (
-                        <option key={idx} value={ch}>{ch}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Question Textarea */}
-                <div style={{ marginBottom: 16 }}>
-                  <label
-                    htmlFor={questionInputId}
-                    style={{ display: "block", fontSize: "0.8rem", color: "var(--muted)", marginBottom: 6, fontWeight: 600 }}
-                  >
-                    Your Question <span style={{ color: "var(--cyan)" }}>*</span>
-                  </label>
-                  <textarea
-                    id={questionInputId}
-                    rows={4}
-                    value={question}
-                    disabled={isLoading}
-                    onChange={(e) => {
-                      setQuestion(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    placeholder="Ask a question from your textbook in Bangla or English..."
-                    style={{ resize: "vertical", fontSize: "0.95rem", lineHeight: 1.6 }}
-                  />
-                </div>
-
-                {/* Submit Row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                    Selected: <strong>{currentClassData?.name || `Class ${selectedClass}`}</strong> · <strong>{selectedSubject}</strong>
-                  </span>
-                  <button
-                    type="submit"
-                    className="primary-btn"
-                    disabled={isLoading}
-                    style={{
-                      padding: "12px 28px",
-                      fontSize: "0.95rem",
-                      opacity: isLoading ? 0.7 : 1,
-                      cursor: isLoading ? "wait" : "pointer",
-                    }}
-                  >
-                    {isLoading ? "AI Tutor Thinking..." : "Ask Question 🚀"}
-                  </button>
-                </div>
-              </form>
-
-              {/* Sample Question Chips */}
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-                <p style={{ fontSize: "0.8rem", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
-                  💡 Try asking one of these sample questions:
-                </p>
-                <div className="prompt-chips">
-                  {SAMPLE_QUESTIONS.slice(0, 4).map((qText, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="chip"
-                      disabled={isLoading}
-                      onClick={() => handlePromptClick(qText)}
-                      style={{ textAlign: "left", fontSize: "0.8rem" }}
-                    >
-                      {qText}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Answer / Chat Area */}
-            <div className="panel" style={{ minHeight: 300 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Answer / Chat Area</h3>
-                {history.length > 0 && (
-                  <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
-                    {history.length} {history.length === 1 ? "question" : "questions"} asked
-                  </span>
-                )}
-              </div>
-
-              {/* Loading Indicator */}
-              {isLoading && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "16px 20px",
-                    background: "rgba(34, 211, 238, 0.08)",
-                    border: "1px solid rgba(34, 211, 238, 0.25)",
-                    borderRadius: "var(--radius-md)",
-                    marginBottom: 16,
-                    animation: "fadeIn 0.2s ease",
-                  }}
-                >
-                  <div className="typing-indicator" style={{ background: "transparent", border: "none", padding: 0 }}>
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
-                    <div className="typing-dot" />
-                  </div>
-                  <span style={{ fontSize: "0.88rem", color: "var(--cyan)", fontWeight: 600 }}>
-                    Retrieving NCTB content &amp; generating AI answer...
-                  </span>
-                </div>
-              )}
-
-              {/* Empty State */}
-              {history.length === 0 && !isLoading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "48px 20px",
-                    textAlign: "center",
-                    background: "rgba(255, 255, 255, 0.02)",
-                    borderRadius: "var(--radius-md)",
-                    border: "1px dashed var(--border)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(34, 211, 238, 0.2))",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "1.6rem",
-                      marginBottom: 14,
-                    }}
-                  >
-                    💬
-                  </div>
-                  <h4 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 6 }}>
-                    No Questions Asked Yet
-                  </h4>
-                  <p style={{ color: "var(--muted)", fontSize: "0.88rem", maxWidth: 420, lineHeight: 1.6 }}>
-                    Choose your class, subject, and chapter above, type your textbook question, and click{" "}
-                    <strong style={{ color: "var(--ink)" }}>&ldquo;Ask Question&rdquo;</strong> to receive an AI-generated answer from the NCTB curriculum.
-                  </p>
+            <div className="aiml" role="log" aria-live="polite" aria-label="Conversation">
+              {msgs.length === 0 && !loading ? (
+                <div className="aies">
+                  <div className="aies-icon" aria-hidden="true">🤖</div>
+                  <h3>আমি তোমার AI Tutor!</h3>
+                  <p>পাঠ্যবই থেকে যেকোনো প্রশ্ন করো।<br />বাংলা বা ইংরেজিতে উত্তর পাবে।</p>
+                  <ul>
+                    <li>পাঠ্যবইয়ের ধারণা বোঝা</li>
+                    <li>কঠিন শব্দের অর্থ</li>
+                    <li>গণিতের ধাপে ধাপে সমাধান</li>
+                    <li>বিজ্ঞানের ব্যাখ্যা</li>
+                    <li>পরীক্ষার প্রস্তুতি</li>
+                  </ul>
+                  {samples.length > 0 && (
+                    <>
+                      <p style={{ fontSize: ".74rem", color: "var(--muted)", marginBottom: 9 }}>💡 এই প্রশ্নগুলো দিয়ে শুরু করতে পারো:</p>
+                      <div className="aichips">
+                        {samples.map((q, i) => (
+                          <button key={i} type="button" className="aichip" disabled={loading} onClick={() => { setDraft(q); inputRef.current?.focus(); }}>{q}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
-                /* History list */
-                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                  {history.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        background: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-md)",
-                        padding: "18px 20px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 12,
-                        animation: "fadeInUp 0.3s ease",
-                      }}
-                    >
-                      {/* Meta Tags */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                          <span className="badge badge-purple">{item.classLevel}</span>
-                          <span className="badge badge-cyan">{item.subject}</span>
-                          {item.chapter && item.chapter !== "All Chapters" && (
-                            <span className="badge badge-orange" style={{ textTransform: "none" }}>
-                              {item.chapter}
-                            </span>
-                          )}
-                          {item.source === "backend" && !item.noContextFound && item.sources.length > 0 && (
-                            <span className="badge badge-green" style={{ fontSize: "0.68rem" }}>
-                              📚 NCTB Matched
-                            </span>
-                          )}
-                          {item.source === "backend" && item.noContextFound && (
-                            <span
-                              className="badge"
-                              style={{
-                                fontSize: "0.68rem",
-                                background: "rgba(245, 158, 11, 0.15)",
-                                color: "var(--orange)",
-                                borderColor: "rgba(245, 158, 11, 0.3)",
-                              }}
-                            >
-                              General Answer
-                            </span>
-                          )}
-                          {item.source === "offline-fallback" && (
-                            <span className="badge" style={{ fontSize: "0.68rem", background: "rgba(248,113,113,0.12)", color: "var(--red)" }}>
-                              Offline
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                          🕒 {item.time}
-                        </span>
-                      </div>
-
-                      {/* Question */}
-                      <div style={{ borderLeft: "3px solid var(--cyan)", paddingLeft: 12 }}>
-                        <div style={{ fontSize: "0.75rem", color: "var(--cyan)", fontWeight: 700, textTransform: "uppercase", marginBottom: 2 }}>
-                          Question
-                        </div>
-                        <div style={{ fontSize: "0.95rem", color: "var(--ink)", fontWeight: 600 }}>
-                          {item.question}
-                        </div>
-                      </div>
-
-                      {/* AI Answer */}
-                      <div
-                        style={{
-                          background: "rgba(34, 211, 238, 0.05)",
-                          border: "1px solid rgba(34, 211, 238, 0.2)",
-                          borderRadius: "var(--radius-sm)",
-                          padding: "14px 16px",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                          <span style={{ fontSize: "1.1rem" }}>🤖</span>
-                          <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "var(--cyan)" }}>
-                            AI Tutor Response
-                          </span>
-                          <span className="badge badge-green" style={{ fontSize: "0.68rem" }}>
-                            Week 3 · Live AI
-                          </span>
-                        </div>
-
-                        {/* Safely rendered answer */}
-                        <AnswerText text={item.answer} />
-
-                        {/* Source attribution */}
-                        <SourceAttribution sources={item.sources} />
-                      </div>
-
-                      {/* Ask another question hint */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
-                          💬 To ask a follow-up, type your next question above.
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  {msgs.map((m) => <Bubble key={m.id} msg={m} />)}
+                  {loading && <LoadingBubble label={loadLabel} />}
+                </>
               )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="aicomp">
+              <form className="aicomp-form" onSubmit={onSubmit}>
+                <textarea
+                  ref={inputRef}
+                  className="aicomp-ta"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKey}
+                  placeholder="তোমার প্রশ্ন লেখো... (Enter = পাঠাও, Shift+Enter = নতুন লাইন)"
+                  disabled={loading}
+                  rows={1}
+                  aria-label="Type your question"
+                />
+                <button type="submit" className="aicomp-btn" disabled={loading || !draft.trim()} aria-label="Send" title="Send">
+                  {loading ? "⏳" : "↑"}
+                </button>
+              </form>
+              <p className="aicomp-hint">Enter · পাঠাও &nbsp;|&nbsp; Shift+Enter · নতুন লাইন</p>
             </div>
           </div>
 
-          {/* Right Column */}
-          <div className="stack-panel">
-            {/* How It Works */}
-            <div className="panel">
-              <h3>📖 How It Works</h3>
-              <ul className="list" style={{ paddingLeft: 0, listStyle: "none" }}>
-                {[
-                  "Select your Class (1 up to 10)",
-                  "Pick your Subject and textbook Chapter",
-                  "Type your question in Bangla or English",
-                  "AI retrieves matching NCTB textbook content",
-                  "Get a class-appropriate explanation instantly",
-                ].map((step, idx) => (
-                  <li
-                    key={idx}
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      padding: "10px 0",
-                      borderBottom: idx < 4 ? "1px solid var(--border)" : "none",
-                      fontSize: "0.87rem",
-                      color: "var(--muted)",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: "rgba(34, 211, 238, 0.12)",
-                        color: "var(--cyan)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 700,
-                        fontSize: "0.78rem",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <span style={{ lineHeight: 1.5 }}>{step}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* NCTB Coverage */}
-            <div className="panel">
-              <h3>📚 NCTB Coverage</h3>
-              <p style={{ fontSize: "0.85rem", color: "var(--muted)", lineHeight: 1.6, marginBottom: 14 }}>
-                SchoolOS AI Tutor is structured around the National Curriculum and Textbook Board (NCTB) Bangladesh syllabus.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {[
-                  { level: "Classes 1 – 5", desc: "Primary foundation in Bangla, English, Math & Science", color: "badge-purple" },
-                  { level: "Classes 6 – 8", desc: "Junior secondary with ICT, BGS, General Science & Math", color: "badge-cyan" },
-                  { level: "Classes 9 – 10", desc: "Secondary SSC streams in Physics, Chemistry, Biology & Higher Math", color: "badge-orange" },
-                ].map((lvl, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.03)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      padding: "10px 14px",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: "0.88rem" }}>{lvl.level}</span>
-                      <span className={`badge ${lvl.color}`}>NCTB</span>
-                    </div>
-                    <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.4 }}>
-                      {lvl.desc}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Week 3 Live Status Card */}
-            <div
-              className="panel"
-              style={{
-                background: "linear-gradient(135deg, rgba(34, 197, 94, 0.10), rgba(34, 211, 238, 0.07))",
-                borderColor: "rgba(34, 197, 94, 0.25)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{ fontSize: "1.2rem" }}>✅</span>
-                <h4 style={{ margin: 0, fontSize: "0.95rem" }}>Week 3 Active</h4>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "0.82rem", color: "var(--muted)", lineHeight: 1.5 }}>
-                <span>✓ NCTB textbook retrieval</span>
-                <span>✓ Keyword search with Bangla support</span>
-                <span>✓ Class-aware prompting (Class 1–10)</span>
-                <span>✓ Google Gemini AI integration</span>
-                <span>✓ Bangla &amp; English answers</span>
-                <span>✓ Textbook source attribution</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      <Footer />
-    </div>
+          <div style={{ height: 28 }} />
+        </main>
+        <Footer />
+      </div>
+    </>
   );
 }

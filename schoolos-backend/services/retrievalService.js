@@ -8,6 +8,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { normalizeSubject } = require("./subjectNormalization");
 
 const CHUNKS_FILE = path.join(
   __dirname,
@@ -70,20 +71,19 @@ class RetrievalService {
         return false;
       }
 
-      // Match subject (case-insensitive substring match)
+      // Normalize and match subject (case-insensitive exact after trimming)
       if (subject && chunk.subject) {
-        const s1 = chunk.subject.toLowerCase();
-        const s2 = subject.toLowerCase();
-        if (!s1.includes(s2) && !s2.includes(s1)) {
+        const normalizedRequestSubject = normalizeSubject(subject);
+        const normalizedChunkSubject = normalizeSubject(chunk.subject);
+        if (normalizedRequestSubject !== normalizedChunkSubject) {
           return false;
         }
       }
 
       // Match chapter if provided and not "All Chapters"
       if (chapter && chapter !== "All Chapters" && chunk.chapter) {
-        const c1 = chunk.chapter.toLowerCase();
-        const c2 = chapter.toLowerCase();
-        if (!c1.includes(c2) && !c2.includes(c1)) {
+        // Exact case-insensitive match after trimming
+        if (chapter.trim().toLowerCase() !== chunk.chapter.trim().toLowerCase()) {
           return false;
         }
       }
@@ -129,7 +129,7 @@ class RetrievalService {
     const questionTokens = this.tokenize(question);
 
     const scored = candidateChunks.map((chunk) => {
-      // Combine all searchable fields into one text blob
+      // Combine searchable fields into one text blob
       const searchable = [
         chunk.text || "",
         chunk.chapter || "",
@@ -141,7 +141,6 @@ class RetrievalService {
 
       let score = 0;
       for (const token of questionTokens) {
-        // Count occurrences (not just presence) for better ranking
         const occurrences = (
           searchable.match(new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []
         ).length;
@@ -151,14 +150,25 @@ class RetrievalService {
       return { ...chunk, _score: score };
     });
 
+    // De‑duplicate chunks based on a unique key (book+chapter+section+page)
+    const seen = new Set();
+    const uniqueScored = [];
+    for (const item of scored) {
+      const key = `${item.book || ""}|${item.chapter || ""}|${item.section || ""}|${item.page || ""}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueScored.push(item);
+      }
+    }
+
     // Sort by score descending; fall back to page order for ties
-    scored.sort((a, b) => {
+    uniqueScored.sort((a, b) => {
       if (b._score !== a._score) return b._score - a._score;
       return (a.page || 0) - (b.page || 0);
     });
 
-    // Return top-K, stripping the internal _score field
-    return scored.slice(0, topK).map(({ _score, ...chunk }) => chunk);
+    // Return top‑K, stripping the internal _score field
+    return uniqueScored.slice(0, topK).map(({ _score, ...chunk }) => chunk);
   }
 }
 

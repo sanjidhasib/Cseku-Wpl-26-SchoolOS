@@ -86,11 +86,11 @@ async function getAnswer({ classLevel, subject, chapter, question }) {
   const sources = noContextFound
     ? []
     : retrievedChunks.map((chunk) => ({
-        book: chunk.book || "NCTB Textbook",
-        chapter: chunk.chapter || "General",
-        section: chunk.section || "",
-        page: chunk.page || null,
-      }));
+      book: chunk.book || "NCTB Textbook",
+      chapter: chunk.chapter || "General",
+      section: chunk.section || "",
+      page: chunk.page || null,
+    }));
 
   // De-duplicate sources (same chapter/section may appear in multiple chunks)
   const uniqueSources = sources.filter(
@@ -108,6 +108,7 @@ async function getAnswer({ classLevel, subject, chapter, question }) {
     chapter: chapter || "",
     sources: uniqueSources,
     noContextFound,
+    retrievedChunkCount: retrievedChunks.length,
   };
 }
 
